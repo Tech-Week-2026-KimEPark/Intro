@@ -4,4 +4,5 @@
 
 ## 목록
 
-아직 등록된 문서가 없습니다. 문서를 추가하면 이 목록에 링크를 추가하십시오.
+- [AMR Search and Rescue 과정 안내](course-overview.md)
+- [COCO 클래스 목록](coco-classes.md)

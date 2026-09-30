@@ -11,4 +11,4 @@
 
 <br><br>
 
-![부산대 TECH WEEK Physical AI 안내 이미지](부산대_TECHWEEK_Physical_AI.png)
+![부산대 TECH WEEK Physical AI 안내 이미지](docs/human/img/course-overview.png)

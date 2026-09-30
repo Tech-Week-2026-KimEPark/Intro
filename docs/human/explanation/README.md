@@ -4,4 +4,10 @@
 
 ## 목록
 
-아직 등록된 문서가 없습니다. 문서를 추가하면 이 목록에 링크를 추가하십시오.
+- [Physical AI 강의 자료 개요](lecture/README.md)
+- [센서](lecture/sensors.md)
+- [Computer Vision](lecture/computer-vision.md)
+- [SLAM](lecture/slam.md)
+- [경로 계획](lecture/planning.md)
+- [주행 제어](lecture/control.md)
+- [의사 결정](lecture/decision-making.md)
