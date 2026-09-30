@@ -77,7 +77,7 @@ while battery > BATTERY_THRESHOLD:
     set_velocity(v_L, v_R)
 ```
 
-yaw 차이를 계산할 때는 −π~π 범위로 정규화하십시오. 정규화하지 않으면 ±180° 경계에서 차이가 360° 가까이 계산됩니다.
+yaw 차이를 계산할 때는 $[-\pi, \pi)$ 범위로 정규화하십시오. 정규화하지 않으면 ±180° 경계에서 차이가 360° 가까이 계산됩니다.
 
 ### Algorithm 3: 코너 탈출 추가
 
@@ -101,34 +101,55 @@ Look-ahead 방식은 경로 위에서 일정 거리 앞의 목표점(Look-ahead 
 | 1. 로봇 위치 파악 | 현재 로봇 좌표에서 Euclidean Distance가 가장 가까운 waypoint 계산 | 117 |
 | 2. Look-ahead Point 설정 | 가장 가까운 waypoint부터 경로 거리(직선 거리 아님) 기준으로 목표점 설정 | 118 |
 | 3. 로봇 Frame 변환 | 로봇 좌표를 원점으로 이동하고 heading이 0°(+x축)가 되도록 회전 | 119~121 |
-| 4. 곡률 계산 | 로봇 Frame 좌표로 곡률 κ 계산 | 122 |
+| 4. 곡률 계산 | 로봇 Frame 좌표로 곡률 $\kappa$ 계산 | 122 |
 | 5. 바퀴 속도 계산 | 선속도·각속도 계산 후 좌우 바퀴 속도로 변환 | 123~125 |
 
 1단계의 최근접 점 탐색은 `scipy.spatial.cKDTree` 또는 `sklearn.neighbors.NearestNeighbors`로 구현할 수 있습니다.
 
 ### 계산식
 
-로봇 위치 `(x_r, y_r)`, heading `θ`, Look-ahead Point `(x_p, y_p)`일 때 계산식은 다음과 같습니다.
+로봇 위치 $(x_r, y_r)$, heading $\theta$, Look-ahead Point $(x_p, y_p)$일 때 계산식은 다음과 같습니다.
 
-```text
-3. 로봇 Frame 변환
-   dx = x_p - x_r,   dy = y_p - y_r
-   x_LA =  cos(θ) * dx + sin(θ) * dy      # 로봇과의 앞뒤 거리
-   y_LA = -sin(θ) * dx + cos(θ) * dy      # 로봇과의 좌우 거리
+**3. 로봇 Frame 변환**
 
-4. 곡률 (단위 m^-1)
-   κ = 2 * y_LA / (x_LA^2 + y_LA^2)
-   κ > 0: 좌회전,  κ < 0: 우회전,  κ = 0: 직진
+$$
+\Delta x = x_p - x_r, \qquad \Delta y = y_p - y_r
+$$
 
-5. 선속도·각속도와 바퀴 속도
-   ω   = v * κ
-   v_r = v + ω * L / 2
-   v_l = v - ω * L / 2
-```
+$$
+\begin{bmatrix} x_{\text{LA}} \\ y_{\text{LA}} \end{bmatrix}
+=
+\begin{bmatrix} \cos\theta & \sin\theta \\ -\sin\theta & \cos\theta \end{bmatrix}
+\begin{bmatrix} \Delta x \\ \Delta y \end{bmatrix}
+$$
 
-5단계의 역변환은 `v = (v_r + v_l) / 2`, `ω = (v_r - v_l) / L`입니다. 이 식은 [Wheel Odometry](slam.md#wheel-odometry)의 `Δs`, `Δθ` 식과 같은 형태입니다. 3단계의 회전 행렬은 슬라이드 119~121의 도식을 식으로 옮긴 것입니다.
+$x_{\text{LA}}$는 로봇과의 앞뒤 거리, $y_{\text{LA}}$는 로봇과의 좌우 거리입니다.
 
-Webots 모터의 `setVelocity()`는 바퀴 각속도(rad/s)를 입력받습니다. 바퀴 선속도를 바퀴 반지름 `R`로 나눈 값을 전달하십시오.
+**4. 곡률 (단위 $\text{m}^{-1}$)**
+
+$$
+\kappa = \frac{2\, y_{\text{LA}}}{x_{\text{LA}}^2 + y_{\text{LA}}^2}
+$$
+
+$\kappa > 0$이면 좌회전, $\kappa < 0$이면 우회전, $\kappa = 0$이면 직진입니다.
+
+**5. 선속도·각속도와 바퀴 속도**
+
+$$
+\omega = v\,\kappa, \qquad
+v_r = v + \frac{\omega L}{2}, \qquad
+v_l = v - \frac{\omega L}{2}
+$$
+
+5단계의 역변환은 다음과 같습니다.
+
+$$
+v = \frac{v_r + v_l}{2}, \qquad \omega = \frac{v_r - v_l}{L}
+$$
+
+이 식은 [Wheel Odometry](slam.md#wheel-odometry)의 $\Delta s$, $\Delta\theta$ 식과 같은 형태입니다. 3단계의 회전 행렬은 슬라이드 119~121의 도식을 식으로 옮긴 것입니다.
+
+Webots 모터의 `setVelocity()`는 바퀴 각속도(rad/s)를 입력받습니다. 바퀴 선속도를 바퀴 반지름 $R$로 나눈 값을 전달하십시오.
 
 ```python
 left_motor.setVelocity(v_l / R)

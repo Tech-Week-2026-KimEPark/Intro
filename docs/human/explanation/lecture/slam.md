@@ -27,21 +27,20 @@ Occupancy Grid Map은 지도를 격자(grid)로 나누고 각 칸(cell)의 상�
 
 ### Cell 점유 확률 계산
 
-각 cell의 점유 확률은 Bayesian Filter로 갱신합니다(슬라이드 54). 0은 free, 1은 occupied입니다. 모든 cell의 초기 확률은 0.5입니다.
+각 cell의 점유 확률은 Bayesian Filter로 갱신합니다(슬라이드 54). 0은 free, 1은 occupied입니다. 모든 cell의 초기 확률은 $P(c_i = \text{occ})_{t=0} = 0.5$입니다.
 
-```text
-P(c_i = occ | z_1:t, x_1:t)
+$$
+\begin{aligned}
+P(c_i = \text{occ} \mid z_{1:t}, x_{1:t})
+&= \frac{P(z_t \mid c_i = \text{occ})\, P(c_i = \text{occ} \mid z_{1:t-1})}{P(z_t \mid z_{1:t-1})} \\[1ex]
+&= \frac{P(\text{hit} \mid \text{occ})\, P(\text{occ} \mid \text{prev}_z)}{P(\text{hit} \mid \text{prev}_z)}
+\end{aligned}
+$$
 
-초기값: P(c_i = occ)_{t=0} = 0.5
-
-P(c_i = occ | z_1:t, x_1:t) = P(z_t | c_i = occ) * P(c_i = occ | z_1:t-1) / P(z_t | z_1:t-1)
-                            = P(hit | occ) * P(occ | prev_z) / P(hit | prev_z)
-```
-
-- `z`: 센서 측정값
-- `x`: 로봇 위치
-- `hit`: 이번 측정에서 해당 cell에 레이저가 닿은 사건
-- `prev_z`: 이전까지의 측정값
+- $z$: 센서 측정값
+- $x$: 로봇 위치
+- $\text{hit}$: 이번 측정에서 해당 cell에 레이저가 닿은 사건
+- $\text{prev}_z$: 이전까지의 측정값
 
 ### Occupancy 데이터 저장 방식
 
@@ -51,14 +50,14 @@ P(c_i = occ | z_1:t, x_1:t) = P(z_t | c_i = occ) * P(c_i = occ | z_1:t-1) / P(z_
 |---|---|---|---|
 | 확률값 보존 | 0~1 | 원본 정보를 직관적으로 보존 | 고정밀 실수 데이터 부담, Underflow 위험 |
 | 정수형 Scaling | 0~100 | 메모리 절감, 연산 단순화 | 정밀도 손실 |
-| Log Space 변환 | −∞~0 | Underflow 방지, 작은 확률의 안정적 표현, Throughput 향상 | 원본 미기재 |
+| Log Space 변환 | $(-\infty, 0]$ | Underflow 방지, 작은 확률의 안정적 표현, Throughput 향상 | 원본 미기재 |
 | Trinary 표현 | 0/100/−1 | 강제 영역 분리로 센서 노이즈 제거, 고속 판별 | 정보 유실로 분석·디버깅 불가 |
 
 Trinary 표현에서 0은 free, 100은 occupied, −1은 unknown입니다.
 
 ## Localization
 
-Localization은 로봇이 미리 만든 지도 위에서 자신의 위치 (x, y, θ)를 추정하는 문제입니다(슬라이드 56). 강의는 측정값만으로 추정하는 방법과 확률 기반 추정 방법을 순서대로 다룹니다.
+Localization은 로봇이 미리 만든 지도 위에서 자신의 위치 $(x, y, \theta)$를 추정하는 문제입니다(슬라이드 56). 강의는 측정값만으로 추정하는 방법과 확률 기반 추정 방법을 순서대로 다룹니다.
 
 ### 측정값 기반 추정
 
@@ -78,30 +77,39 @@ Wheel Encoder는 Pulse Count로 바퀴 이동 거리를 계산합니다. 두 바
 
 | 변수 | 의미 |
 |---|---|
-| `R` | 바퀴 반지름(WheelRadius) |
-| `L` | 좌우 바퀴 간격(WheelSeparation) |
-| `C_l`, `C_r` | 좌우 Encoder Pulse Count |
-| `PPR` | 바퀴 1회전당 Pulse 수(Pulse Per Revolution) |
-| `φ_l`, `φ_r` | 좌우 바퀴 회전각(rad) |
+| $R$ | 바퀴 반지름(WheelRadius) |
+| $L$ | 좌우 바퀴 간격(WheelSeparation) |
+| $C_l$, $C_r$ | 좌우 Encoder Pulse Count |
+| $\text{PPR}$ | 바퀴 1회전당 Pulse 수(Pulse Per Revolution) |
+| $\varphi_l$, $\varphi_r$ | 좌우 바퀴 회전각(rad) |
 
 계산 순서는 다음과 같습니다.
 
-```text
-1. 바퀴 이동 거리
-   d_l = (C_l / PPR) * 2πR        또는  d_l = R * φ_l
-   d_r = (C_r / PPR) * 2πR        또는  d_r = R * φ_r
+**1. 바퀴 이동 거리**
 
-2. 로봇 이동 거리와 회전 각도
-   Δs = (d_r + d_l) / 2
-   Δθ = (d_r - d_l) / L
+Pulse Count 또는 바퀴 회전각으로 계산합니다.
 
-3. 회전 반지름과 이동 후 위치 (로봇 기준 좌표)
-   R_c = Δs / Δθ
-   x   = R_c * sin(Δθ)
-   y   = R_c * (1 - cos(Δθ))
-```
+$$
+d_l = \frac{C_l}{\text{PPR}} \cdot 2\pi R = R\,\varphi_l, \qquad
+d_r = \frac{C_r}{\text{PPR}} \cdot 2\pi R = R\,\varphi_r
+$$
 
-`Δθ`가 0이면 직진이므로 `R_c`를 계산하지 않고 `x = Δs`, `y = 0`을 사용하십시오. Webots의 바퀴 `PositionSensor`는 회전각(rad)을 반환하므로 `d = R * φ` 식을 사용합니다.
+**2. 로봇 이동 거리와 회전 각도**
+
+$$
+\Delta s = \frac{d_r + d_l}{2}, \qquad
+\Delta\theta = \frac{d_r - d_l}{L}
+$$
+
+**3. 회전 반지름과 이동 후 위치 (로봇 기준 좌표)**
+
+$$
+R_c = \frac{\Delta s}{\Delta\theta}, \qquad
+x = R_c \sin\Delta\theta, \qquad
+y = R_c\,(1 - \cos\Delta\theta)
+$$
+
+$\Delta\theta = 0$이면 직진이므로 $R_c$를 계산하지 않고 $x = \Delta s$, $y = 0$을 사용하십시오. Webots의 바퀴 `PositionSensor`는 회전각(rad)을 반환하므로 $d = R\,\varphi$ 식을 사용합니다.
 
 ### Scan Matching
 
@@ -129,12 +137,14 @@ flowchart TD
 
 4단계의 계산식은 다음과 같습니다(슬라이드 65).
 
-```text
-H = P'^T Q' = U Σ V^T
-R = V U^T = [[cos θ, -sin θ],
-             [sin θ,  cos θ]]
-t = q̄ - R p̄
-```
+$$
+\begin{aligned}
+H &= P'^{\mathsf{T}} Q' = U \Sigma V^{\mathsf{T}} \\
+R &= V U^{\mathsf{T}} =
+\begin{bmatrix} \cos\theta & -\sin\theta \\ \sin\theta & \cos\theta \end{bmatrix} \\
+t &= \bar{q} - R\,\bar{p}
+\end{aligned}
+$$
 
 ```python
 U, S, V_t = np.linalg.svd(H)
@@ -145,22 +155,32 @@ R = V_t.T @ U.T
 
 #### ICP 계산 예시
 
-슬라이드 66~68의 예시입니다. P를 90° 회전하면 Q가 됩니다.
+슬라이드 66~68의 예시입니다. $P$를 $90^\circ$ 회전하면 $Q$가 됩니다. 행렬의 각 행은 점 1개의 $(x, y)$ 좌표입니다.
 
-```text
-P  = [[1, 0], [0, 1], [-1, 0]]           p̄ = (0, 1/3)
-Q  = [[0, 1], [-1, 0], [0, -1]]          q̄ = (-1/3, 0)
+$$
+P = \begin{bmatrix} 1 & 0 \\ 0 & 1 \\ -1 & 0 \end{bmatrix}, \quad
+\bar{p} = \left(0,\ \tfrac{1}{3}\right), \qquad
+Q = \begin{bmatrix} 0 & 1 \\ -1 & 0 \\ 0 & -1 \end{bmatrix}, \quad
+\bar{q} = \left(-\tfrac{1}{3},\ 0\right)
+$$
 
-P' = [[1, -1/3], [0, 2/3], [-1, -1/3]]
-Q' = [[1/3, 1], [-2/3, 0], [1/3, -1]]
+$$
+P' = \begin{bmatrix} 1 & -\tfrac{1}{3} \\ 0 & \tfrac{2}{3} \\ -1 & -\tfrac{1}{3} \end{bmatrix}, \qquad
+Q' = \begin{bmatrix} \tfrac{1}{3} & 1 \\ -\tfrac{2}{3} & 0 \\ \tfrac{1}{3} & -1 \end{bmatrix}
+$$
 
-H  = P'^T Q' = [[0, 2], [-2/3, 0]]
-U  = [[1, 0], [0, -1]]    V = [[0, 1], [1, 0]]
-R  = V U^T = [[0, -1], [1, 0]]    θ = 90°
-t  = q̄ - R p̄ = (0, 0)
-```
+$$
+H = P'^{\mathsf{T}} Q' = \begin{bmatrix} 0 & 2 \\ -\tfrac{2}{3} & 0 \end{bmatrix}, \qquad
+U = \begin{bmatrix} 1 & 0 \\ 0 & -1 \end{bmatrix}, \qquad
+V = \begin{bmatrix} 0 & 1 \\ 1 & 0 \end{bmatrix}
+$$
 
-원본 슬라이드 68은 H의 (2, 1) 성분을 −1로 표기합니다. NumPy 계산 값은 −2/3이며 회전 결과(θ = 90°)는 같습니다.
+$$
+R = V U^{\mathsf{T}} = \begin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix} \ (\theta = 90^\circ), \qquad
+t = \bar{q} - R\,\bar{p} = (0,\ 0)
+$$
+
+원본 슬라이드 68은 $H$의 $(2, 1)$ 성분을 $-1$로 표기합니다. NumPy 계산 값은 $-\tfrac{2}{3}$이며 회전 결과($\theta = 90^\circ$)는 같습니다.
 
 ### 시뮬레이션 전제
 
@@ -189,32 +209,30 @@ Odometry 기반 Pose Prediction은 30Hz로 실행합니다. Scan-to-Map 기반 P
 
 ### Kalman Filter
 
-Kalman Filter는 움직임 예측값과 측정값을 결합해 상태를 추정합니다(슬라이드 76).
+Kalman Filter는 움직임 예측값과 측정값을 결합해 상태를 추정합니다(슬라이드 76). 1회 갱신의 입력은 $\mu_{t-1}$, $\Sigma_{t-1}$, $u_t$, $z_t$이고 출력은 $\mu_t$, $\Sigma_t$입니다.
 
-```text
-Algorithm Kalman_filter(μ_{t-1}, Σ_{t-1}, u_t, z_t):
-  μ̄_t = A_t μ_{t-1} + B_t u_t                    # 상태 예측
-  Σ̄_t = A_t Σ_{t-1} A_t^T + R_t                  # 공분산 예측
-  K_t = Σ̄_t C_t^T (C_t Σ̄_t C_t^T + Q_t)^{-1}     # Kalman gain
-  μ_t = μ̄_t + K_t (z_t - C_t μ̄_t)                # 측정값으로 상태 보정
-  Σ_t = (I - K_t C_t) Σ̄_t                        # 공분산 보정
-  return μ_t, Σ_t
-```
+| 단계 | 계산식 |
+|---|---|
+| 상태 예측 | $\bar{\mu}_t = A_t \mu_{t-1} + B_t u_t$ |
+| 공분산 예측 | $\bar{\Sigma}_t = A_t \Sigma_{t-1} A_t^{\mathsf{T}} + R_t$ |
+| Kalman gain | $K_t = \bar{\Sigma}_t C_t^{\mathsf{T}} \left( C_t \bar{\Sigma}_t C_t^{\mathsf{T}} + Q_t \right)^{-1}$ |
+| 측정값으로 상태 보정 | $\mu_t = \bar{\mu}_t + K_t \left( z_t - C_t \bar{\mu}_t \right)$ |
+| 공분산 보정 | $\Sigma_t = \left( I - K_t C_t \right) \bar{\Sigma}_t$ |
 
 | 기호 | 의미 |
 |---|---|
-| `μ` | state estimate |
-| `Σ` | estimate covariance matrix |
-| `u` | control |
-| `z` | measurement |
-| `A` | state transition model |
-| `B` | control input model |
-| `C` | observation model |
-| `R` | process noise covariance matrix |
-| `Q` | measurement noise covariance matrix |
-| `K` | Kalman gain |
+| $\mu$ | state estimate |
+| $\Sigma$ | estimate covariance matrix |
+| $u$ | control |
+| $z$ | measurement |
+| $A$ | state transition model |
+| $B$ | control input model |
+| $C$ | observation model |
+| $R$ | process noise covariance matrix |
+| $Q$ | measurement noise covariance matrix |
+| $K$ | Kalman gain |
 
-`Q`는 슬라이드 수식에만 있고 기호 설명에는 없습니다. 표의 `Q` 설명은 Kalman Filter의 표준 정의입니다.
+$Q$는 슬라이드 수식에만 있고 기호 설명에는 없습니다. 표의 $Q$ 설명은 Kalman Filter의 표준 정의입니다.
 
 | 구분 | 내용 |
 |---|---|
@@ -234,7 +252,7 @@ Algorithm Kalman_filter(μ_{t-1}, Σ_{t-1}, u_t, z_t):
 
 ### Monte Carlo 추정
 
-Monte Carlo 추정은 랜덤 샘플을 많이 뽑아 확률을 근사하는 방법입니다(슬라이드 80). 샘플 수가 많을수록 실제 값으로 수렴합니다. 오차는 샘플 수 n에 대해 1/√n 비율로 감소합니다.
+Monte Carlo 추정은 랜덤 샘플을 많이 뽑아 확률을 근사하는 방법입니다(슬라이드 80). 샘플 수가 많을수록 실제 값으로 수렴합니다. 오차는 샘플 수 $n$에 대해 $1/\sqrt{n}$ 비율로 감소합니다.
 
 ### Particle Filter
 
@@ -242,10 +260,10 @@ Particle Filter는 Monte Carlo 샘플(Particle)로 로봇의 가능한 위치를
 
 | 단계 | 처리 내용 |
 |---|---|
-| 1. Initialization | Particle을 지도 전체에 랜덤 배치. 모든 가중치를 1/n으로 설정 |
+| 1. Initialization | Particle을 지도 전체에 랜덤 배치. 모든 가중치를 $1/n$으로 설정 |
 | 2. Prediction | 로봇 이동량만큼 Particle 이동. Encoder 오차와 바퀴 미끄러짐을 반영한 노이즈 추가 |
-| 3. Update | 실제 LiDAR scan과 각 Particle 위치의 지도 기반 expected scan 비교. `P(sensor \| particle)`로 가중치 부여 후 정규화 |
-| 4. Resampling | 가중치에 비례하는 확률로 n개 재추출(중복 허용). 가능성이 낮은 Particle 제거 |
+| 3. Update | 실제 LiDAR scan과 각 Particle 위치의 지도 기반 expected scan 비교. $P(\text{sensor} \mid \text{particle})$로 가중치 부여 후 정규화 |
+| 4. Resampling | 가중치에 비례하는 확률로 $n$개 재추출(중복 허용). 가능성이 낮은 Particle 제거 |
 
 #### Resampling 문제와 해결책
 
@@ -264,9 +282,9 @@ ESS(Effective Sample Size)는 현재 Particle 중 실제로 유효한 샘플 수
 
 최종 위치는 MAP(Maximum a Posteriori) 방식으로 가중치가 가장 큰 Particle을 선택합니다(슬라이드 90).
 
-```text
-x_t = x_t^(i*),   i* = argmax_i w_t^(i)
-```
+$$
+x_t = x_t^{(i^*)}, \qquad i^* = \operatorname*{arg\,max}_i\ w_t^{(i)}
+$$
 
 ### AMCL
 
