@@ -6,5 +6,7 @@
 |---|---|
 | 문서 작성·이동 | [작성 안내](https://github.com/Tech-Week-2026-KimEPark/docs/blob/main/human/how-to/write-docs.md) |
 | 사람용 설명 | [이 저장소 문서](../human/README.md) |
+| 해커톤 조건·개발 환경 확인 | [과정 안내](../human/reference/course-overview.md) |
+| 강의 개념·실습 컨트롤러 대응 확인 | [강의 자료 개요](../human/explanation/lecture/README.md) |
 
 제품 규칙이나 API 필드를 이 폴더에 다시 작성하지 마십시오. 사람용 원본 문서로 연결하십시오.
